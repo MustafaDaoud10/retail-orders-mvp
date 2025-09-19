@@ -1,0 +1,6 @@
+KPI,Description,Formula,Granularity
+Avg Price for Best-Selling Products,Shows the average selling price of products that are top-sellers.,AVG(Sales / Quantity) grouped by Product,"Month, Product"
+Sales Dynamics by States,Measures how sales evolve (grow/shrink) across states.,"SUM(Sales) grouped by State, Month","Month, State"
+Best Customers in Segments,Identifies top customers based on total sales within each segment.,RANK(SUM(Sales)) by Customer within Segment,"Segment, Customer, Month"
+Top/Bottom Products by Sales per State,Products with highest/lowest sales in each state.,RANK(SUM(Sales)) by Product within State,"State, Product, Month"
+Top/Bottom Products by Avg Delivery Time per State,Products with longest/shortest average delivery times in each state.,"AVG(DATEDIFF(Ship Date, Order Date)) by Product within State","State, Product, Month"

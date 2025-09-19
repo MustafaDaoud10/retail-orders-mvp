@@ -1,0 +1,123 @@
+CREATE SCHEMA IF NOT EXISTS staging;
+CREATE SCHEMA IF NOT EXISTS dwh_master;
+CREATE SCHEMA IF NOT EXISTS dwh_sales;
+CREATE SCHEMA IF NOT EXISTS marts;
+
+CREATE TABLE IF NOT EXISTS staging.file_audit (
+    file_audit_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    file_name TEXT NOT NULL,
+    snapshot_month DATE,
+    loaded_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    row_count INTEGER,
+    checksum TEXT,
+    is_latest BOOLEAN DEFAULT FALSE
+);
+
+
+CREATE TABLE IF NOT EXISTS staging.orders_stg (
+    row_id INTEGER,
+    order_id VARCHAR(50),
+    order_date DATE,
+    ship_date DATE,
+    ship_mode VARCHAR(50),
+    customer_id VARCHAR(50),
+    customer_name VARCHAR(255),
+    segment VARCHAR(50),
+    country VARCHAR(100),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    postal_code VARCHAR(20),
+    region VARCHAR(50),
+    product_id VARCHAR(50),
+    category VARCHAR(100),
+    sub_category VARCHAR(100),
+    product_name VARCHAR(255),
+    sales NUMERIC(12,2),
+    quantity INTEGER,
+    discount NUMERIC(5,2),
+    profit NUMERIC(12,2),
+    source_file TEXT,
+    file_loaded_at TIMESTAMP,
+    snapshot_month DATE,
+    CONSTRAINT chk_sales_nonneg CHECK (sales IS NULL OR sales >= 0),
+    CONSTRAINT chk_qty_nonneg CHECK (quantity IS NULL OR quantity >= 0),
+    CONSTRAINT chk_disc_range CHECK (discount IS NULL OR (discount >= 0 AND discount <= 1)),
+    CONSTRAINT chk_dates CHECK (order_date IS NULL OR ship_date IS NULL OR ship_date >= order_date)
+);
+
+
+
+
+CREATE TABLE dwh_master.dim_customer (
+    customer_sk BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    customer_id VARCHAR(50) NOT NULL UNIQUE,
+    customer_name VARCHAR(255),
+    segment VARCHAR(50)
+);
+
+
+CREATE TABLE dwh_master.dim_product (
+    product_sk BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    product_id VARCHAR(50) NOT NULL UNIQUE,
+    product_name VARCHAR(255),
+    subcategory VARCHAR(100),
+    category VARCHAR(100)
+);
+
+
+CREATE TABLE dwh_master.dim_geography (
+    geography_sk BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    country VARCHAR(100),
+    state VARCHAR(100),
+    city VARCHAR(100),
+    postal_code VARCHAR(20),
+    region VARCHAR(50),
+    CONSTRAINT uq_dim_geography UNIQUE (country, state, city, postal_code, region)
+);
+
+
+CREATE TABLE dwh_master.dim_ship_mode (
+    ship_mode_sk BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    ship_mode VARCHAR(50) NOT NULL UNIQUE
+);
+
+
+CREATE TABLE dwh_master.dim_date (
+    date_sk BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    date_value DATE NOT NULL UNIQUE,
+    day_of_week SMALLINT,
+    week SMALLINT,
+    month SMALLINT,
+    quarter SMALLINT,
+    year SMALLINT,
+    CONSTRAINT chk_dim_date_month CHECK (month BETWEEN 1 AND 12),
+    CONSTRAINT chk_dim_date_quarter CHECK (quarter BETWEEN 1 AND 4),
+    CONSTRAINT chk_dim_date_dayofweek CHECK (day_of_week BETWEEN 0 AND 7)
+);
+
+
+CREATE TABLE dwh_sales.fct_sales (
+    order_line_sk BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id VARCHAR(50),
+    row_id INTEGER,
+    customer_sk BIGINT NOT NULL REFERENCES dwh_master.dim_customer(customer_sk),
+    product_sk BIGINT NOT NULL REFERENCES dwh_master.dim_product(product_sk),
+    geography_sk BIGINT NOT NULL REFERENCES dwh_master.dim_geography(geography_sk),
+    ship_mode_sk BIGINT NOT NULL REFERENCES dwh_master.dim_ship_mode(ship_mode_sk),
+    order_date_sk BIGINT NOT NULL REFERENCES dwh_master.dim_date(date_sk),
+    ship_date_sk BIGINT NOT NULL REFERENCES dwh_master.dim_date(date_sk),
+    quantity INTEGER NOT NULL CHECK (quantity >= 1),
+    sales NUMERIC(12,2) NOT NULL CHECK (sales >= 0),
+    discount NUMERIC(5,2) NOT NULL CHECK (discount >= 0 AND discount <= 1),
+    profit NUMERIC(12,2),
+    delivery_days INTEGER CHECK (delivery_days IS NULL OR delivery_days >= 0),
+    CONSTRAINT uq_fct_sales_nk UNIQUE (order_id, product_sk, row_id)
+);
+
+
+CREATE INDEX ix_fct_sales_customer_sk ON dwh_sales.fct_sales (customer_sk);
+CREATE INDEX ix_fct_sales_product_sk ON dwh_sales.fct_sales (product_sk);
+CREATE INDEX ix_fct_sales_geography_sk ON dwh_sales.fct_sales (geography_sk);
+CREATE INDEX ix_fct_sales_ship_mode_sk ON dwh_sales.fct_sales (ship_mode_sk);
+CREATE INDEX ix_fct_sales_order_date_sk ON dwh_sales.fct_sales (order_date_sk);
+CREATE INDEX ix_fct_sales_ship_date_sk ON dwh_sales.fct_sales (ship_date_sk);

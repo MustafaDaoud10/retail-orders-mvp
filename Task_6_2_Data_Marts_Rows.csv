@@ -1,0 +1,7 @@
+Data Mart System Name,Count Rows,Count Distinct Primary Key
+dim_date,1464,1464.0
+dim_ship_mode,4,4.0
+dim_customer,793,793.0
+dim_product,1885,1885.0
+dim_geography,628,628.0
+fact_order_lines,9748,
